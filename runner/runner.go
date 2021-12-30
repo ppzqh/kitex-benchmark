@@ -65,7 +65,7 @@ func (r *Runner) benching(onceFn RunOnce, concurrent int, total int64, cliSleep 
 				r.counter.AddRecord(idx, err, cost)
 
 				if idx/sleepInterval != lastIdx/sleepInterval {
-					time.Sleep(time.Duration(cliSleep) * time.Second)
+					time.Sleep(time.Duration(cliSleep) * time.Millisecond)
 				}
 				lastIdx = idx
 			}

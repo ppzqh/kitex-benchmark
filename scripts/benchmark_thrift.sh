@@ -1,8 +1,8 @@
 #!/bin/bash
 
 . ./scripts/env.sh
-repo=("kitex" "kitex-mux")
-ports=(8001 8002)
+repo=("kitex")
+ports=(8001)
 
 . ./scripts/build_thrift.sh
 
