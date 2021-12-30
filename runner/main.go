@@ -19,19 +19,19 @@ package runner
 import (
 	"flag"
 	"fmt"
+	"github.com/cloudwego/kitex-benchmark/perf"
 	"log"
 	"strconv"
-
-	"github.com/cloudwego/kitex-benchmark/perf"
 )
 
 var (
-	address    string
-	echoSize   int
-	total      int64
-	concurrent int
-	poolSize   int
-	sleepTime  int
+	address      string
+	echoSize     int
+	total        int64
+	concurrent   int
+	poolSize     int
+	sleepTime    int
+	cliSleepTime int
 )
 
 type Options struct {
@@ -58,6 +58,8 @@ func initFlags() {
 	flag.Int64Var(&total, "n", 1, "call total nums")
 	flag.IntVar(&poolSize, "pool", 10, "conn poll size")
 	flag.IntVar(&sleepTime, "sleep", 0, "sleep time for every request handler")
+
+	flag.IntVar(&cliSleepTime, "cliSleep", 0, "sleep time for every request of client")
 	flag.Parse()
 }
 
@@ -88,10 +90,13 @@ func Main(name string, newer ClientNewer) {
 		st := strconv.Itoa(sleepTime)
 		payload = fmt.Sprintf("%s,%s", st, payload[len(st)+1:])
 	}
-	handler := func() error { return cli.Echo(action, payload) }
+	warmupHandler := func() error { return cli.Echo(action, payload) }
+	benchHandler := func() error {
+		return cli.Echo(action, payload)
+	}
 
 	// === warming ===
-	r.Warmup(handler, concurrent, 100*1000)
+	r.Warmup(warmupHandler, concurrent, 100*1000)
 
 	// === beginning ===
 	if err := cli.Echo(BeginAction, ""); err != nil {
@@ -101,7 +106,7 @@ func Main(name string, newer ClientNewer) {
 	recorder.Begin()
 
 	// === benching ===
-	r.Run(name, handler, concurrent, total, echoSize, sleepTime)
+	r.Run(name, benchHandler, concurrent, total, echoSize, sleepTime, cliSleepTime)
 
 	// == ending ===
 	recorder.End()

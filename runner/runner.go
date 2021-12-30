@@ -40,13 +40,19 @@ func NewRunner() *Runner {
 	return r
 }
 
-func (r *Runner) benching(onceFn RunOnce, concurrent int, total int64) {
+func (r *Runner) benching(onceFn RunOnce, concurrent int, total int64, cliSleep int) {
 	var wg sync.WaitGroup
 	wg.Add(concurrent)
 	r.counter.Reset(total)
+
+	var sleepInterval int64
+	sleepInterval = 100
 	for i := 0; i < concurrent; i++ {
 		go func() {
 			defer wg.Done()
+			var lastIdx int64
+			lastIdx = 0
+
 			for {
 				idx := r.counter.Idx()
 				if idx >= total {
@@ -57,6 +63,11 @@ func (r *Runner) benching(onceFn RunOnce, concurrent int, total int64) {
 				end := r.timer.Now()
 				cost := end - begin
 				r.counter.AddRecord(idx, err, cost)
+
+				if idx/sleepInterval != lastIdx/sleepInterval {
+					time.Sleep(time.Duration(cliSleep) * time.Second)
+				}
+				lastIdx = idx
 			}
 		}()
 	}
@@ -65,18 +76,19 @@ func (r *Runner) benching(onceFn RunOnce, concurrent int, total int64) {
 }
 
 func (r *Runner) Warmup(onceFn RunOnce, concurrent int, total int64) {
-	r.benching(onceFn, concurrent, total)
+	r.benching(onceFn, concurrent, total, 0)
 }
 
 // 并发测试
-func (r *Runner) Run(title string, onceFn RunOnce, concurrent int, total int64, echoSize, sleepTime int) {
+func (r *Runner) Run(title string, onceFn RunOnce, concurrent int, total int64, echoSize, sleepTime int,
+	cliSleepTime int) {
 	logInfo(
 		"%s start benching, concurrent: %d, total: %d, sleep: %d",
 		"["+title+"]", concurrent, total, sleepTime,
 	)
 
 	start := r.timer.Now()
-	r.benching(onceFn, concurrent, total)
+	r.benching(onceFn, concurrent, total, cliSleepTime)
 	stop := r.timer.Now()
 	r.counter.Report(title, stop-start, concurrent, total, echoSize)
 }
