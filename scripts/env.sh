@@ -30,7 +30,7 @@ n=50000
 body=(1024)
 concurrent=(100 200 400 600 800 1000)
 sleep=0
-cliSleep=500
+cliSleep=1000
 
 nice_cmd=''
 tee_cmd="tee -a output/${REPORT}.log"

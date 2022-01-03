@@ -40,18 +40,14 @@ func NewRunner() *Runner {
 	return r
 }
 
-func (r *Runner) benching(onceFn RunOnce, concurrent int, total int64, cliSleep int) {
+func (r *Runner) benching(onceFn RunOnce, concurrent int, total int64) {
 	var wg sync.WaitGroup
 	wg.Add(concurrent)
 	r.counter.Reset(total)
 
-	var sleepInterval int64
-	sleepInterval = 100
 	for i := 0; i < concurrent; i++ {
 		go func() {
 			defer wg.Done()
-			var lastIdx int64
-			lastIdx = 0
 
 			for {
 				idx := r.counter.Idx()
@@ -63,11 +59,35 @@ func (r *Runner) benching(onceFn RunOnce, concurrent int, total int64, cliSleep 
 				end := r.timer.Now()
 				cost := end - begin
 				r.counter.AddRecord(idx, err, cost)
+			}
+		}()
+	}
+	wg.Wait()
+	r.counter.Total = total
+}
 
-				if idx/sleepInterval != lastIdx/sleepInterval {
-					time.Sleep(time.Duration(cliSleep) * time.Millisecond)
+func (r *Runner) lowQPSBenching(onceFn RunOnce, concurrent int, total int64, cliSleepTime int) {
+	var wg sync.WaitGroup
+	wg.Add(concurrent)
+	r.counter.Reset(total)
+
+	for i := 0; i < concurrent; i++ {
+		go func() {
+			defer wg.Done()
+
+			for j := 0; ; j ++ {
+				if j % 100 == 0 {
+					time.Sleep(time.Duration(cliSleepTime) * time.Millisecond)
 				}
-				lastIdx = idx
+				idx := r.counter.Idx()
+				if idx >= total {
+					return
+				}
+				begin := r.timer.Now()
+				err := onceFn()
+				end := r.timer.Now()
+				cost := end - begin
+				r.counter.AddRecord(idx, err, cost)
 			}
 		}()
 	}
@@ -76,7 +96,7 @@ func (r *Runner) benching(onceFn RunOnce, concurrent int, total int64, cliSleep 
 }
 
 func (r *Runner) Warmup(onceFn RunOnce, concurrent int, total int64) {
-	r.benching(onceFn, concurrent, total, 0)
+	r.benching(onceFn, concurrent, total)
 }
 
 // 并发测试
@@ -88,7 +108,8 @@ func (r *Runner) Run(title string, onceFn RunOnce, concurrent int, total int64, 
 	)
 
 	start := r.timer.Now()
-	r.benching(onceFn, concurrent, total, cliSleepTime)
+	//r.benching(onceFn, concurrent, total, cliSleepTime)
+	r.lowQPSBenching(onceFn, concurrent, total, cliSleepTime)
 	stop := r.timer.Now()
 	r.counter.Report(title, stop-start, concurrent, total, echoSize)
 }
