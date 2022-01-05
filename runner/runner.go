@@ -66,7 +66,7 @@ func (r *Runner) benching(onceFn RunOnce, concurrent int, total int64) {
 	r.counter.Total = total
 }
 
-func (r *Runner) lowQPSBenching(onceFn RunOnce, concurrent int, total int64, cliSleepTime int) {
+func (r *Runner) cleanConnBenching(onceFn RunOnce, concurrent int, total int64, cliSleepTime int) {
 	var wg sync.WaitGroup
 	wg.Add(concurrent)
 	r.counter.Reset(total)
@@ -74,20 +74,19 @@ func (r *Runner) lowQPSBenching(onceFn RunOnce, concurrent int, total int64, cli
 	for i := 0; i < concurrent; i++ {
 		go func() {
 			defer wg.Done()
-
-			for j := 0; ; j ++ {
-				if j % 100 == 0 {
-					time.Sleep(time.Duration(cliSleepTime) * time.Millisecond)
+			for {
+				for j := 0; j < 1000; j++ {
+					idx := r.counter.Idx()
+					if idx >= total {
+						return
+					}
+					begin := r.timer.Now()
+					err := onceFn()
+					end := r.timer.Now()
+					cost := end - begin
+					r.counter.AddRecord(idx, err, cost)
 				}
-				idx := r.counter.Idx()
-				if idx >= total {
-					return
-				}
-				begin := r.timer.Now()
-				err := onceFn()
-				end := r.timer.Now()
-				cost := end - begin
-				r.counter.AddRecord(idx, err, cost)
+				time.Sleep(time.Duration(cliSleepTime) * time.Millisecond)
 			}
 		}()
 	}
@@ -109,7 +108,7 @@ func (r *Runner) Run(title string, onceFn RunOnce, concurrent int, total int64, 
 
 	start := r.timer.Now()
 	//r.benching(onceFn, concurrent, total, cliSleepTime)
-	r.lowQPSBenching(onceFn, concurrent, total, cliSleepTime)
+	r.cleanConnBenching(onceFn, concurrent, total, cliSleepTime)
 	stop := r.timer.Now()
 	r.counter.Report(title, stop-start, concurrent, total, echoSize)
 }
